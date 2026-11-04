@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use App\Services\XlsxExporter;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class EmployeeController extends Controller
 {
@@ -21,17 +25,9 @@ class EmployeeController extends Controller
         $direction = strtolower((string) $request->query('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
 
         $perPage = (int) $request->query('per_page', 10);
-        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
 
-        $query = Employee::query();
-
-        foreach (self::FILTER_FIELDS as $field) {
-            $filter = trim((string) $request->query($field, ''));
-
-            if ($filter !== '') {
-                $query->where($field.'_search', 'like', '%'.Employee::normalizeForSearch($filter).'%');
-            }
-        }
+        $query = $this->filtered($request);
 
         $column = $sort === 'created_at' ? $sort : $sort.'_search';
 
@@ -47,7 +43,40 @@ class EmployeeController extends Controller
             'sort' => $sort,
             'direction' => $direction,
             'perPage' => $perPage,
+            'departments' => Employee::query()->distinct()->orderBy('department')->pluck('department'),
         ]);
+    }
+
+    public function export(Request $request, XlsxExporter $xlsx): Response
+    {
+        $query = $this->filtered($request);
+        $sort = in_array($request->query('sort'), [...self::FILTER_FIELDS, 'created_at'], true) ? $request->query('sort') : 'first_name';
+        $direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $query->orderBy($sort === 'created_at' ? $sort : $sort.'_search', $direction)->orderBy('id');
+        $ids = array_values(array_filter(array_map('intval', explode(',', (string) $request->query('ids')))));
+        if ($request->query('scope') === 'selected' && $ids !== []) $query->whereIn('id', $ids);
+        if ($request->query('scope') === 'page') $query->forPage(max(1,(int)$request->query('page',1)), min(100,max(1,(int)$request->query('per_page',10))));
+        $rows = $query->cursor()->map(fn(Employee $e) => [$e->id,$e->first_name,$e->last_name,$e->email,$e->department,$e->created_at]);
+        try {
+            return $xlsx->download('personeller-'.now()->format('Ymd-His').'.xlsx', ['ID','Ad','Soyad','E-posta','Departman','Oluşturulma tarihi'], $rows);
+        } catch (Throwable $exception) {
+            report($exception);
+            return redirect()->route('employees.index', $request->except(['scope','ids']))->with('error', $exception->getMessage());
+        }
+    }
+
+    private function filtered(Request $request)
+    {
+        $query = Employee::query();
+        $global = Employee::normalizeForSearch(trim((string)$request->query('search')));
+        if ($global !== '') $query->where(function($q) use($global){ foreach(self::FILTER_FIELDS as $field) $q->orWhere($field.'_search','like','%'.$global.'%'); });
+        foreach (self::FILTER_FIELDS as $field) {
+            $filter = trim((string) $request->query($field, ''));
+            if ($filter !== '') $query->where($field.'_search', 'like', '%'.Employee::normalizeForSearch($filter).'%');
+        }
+        if ($request->filled('created_from')) $query->whereDate('created_at','>=',$request->query('created_from'));
+        if ($request->filled('created_to')) $query->whereDate('created_at','<=',$request->query('created_to'));
+        return $query;
     }
 
     public function store(Request $request): RedirectResponse

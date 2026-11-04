@@ -6,14 +6,14 @@ This repository contains two independent Laravel applications. Personnel Service
 
 ## Architecture
 
-- `personnel-service/`: employee CRUD UI, SQLite database, Basic Auth administration, Bearer-token REST API.
+- `personnel-service/`: employee CRUD UI, SQLite database, session-authenticated administration, Bearer-token REST API.
 - `training-portal/`: training and assignment UI, separate SQLite database, server-side Personnel Service client.
 - The applications never share a database. Training Portal stores an employee snapshot on each assignment so history remains readable if an employee is later removed from Personnel Service.
 - `completed_at` is the single source of truth for completion status.
 
 ## Technology stack
 
-PHP 8.3+, Laravel 13, SQLite, Blade, Bootstrap 5, Bootstrap Icons, SweetAlert2, and Laravel HTTP Client.
+PHP 8.3+, Laravel 13, SQLite, Blade, Bootstrap 5, Bootstrap Icons, SweetAlert2, PhpSpreadsheet, and Laravel HTTP Client.
 
 ## Requirements
 
@@ -81,6 +81,22 @@ cd training-portal && php artisan serve --host=127.0.0.1 --port=8002
 
 Open `http://127.0.0.1:8001/employees` and `http://127.0.0.1:8002`.
 
+Both applications redirect unauthenticated browser requests to their own responsive login screen. Credentials continue to come from the application-specific environment variables shown above; passwords and API tokens are never rendered client-side.
+
+## Management authentication
+
+- Login forms are CSRF protected and rate limited to five attempts per minute.
+- Credentials are checked server-side against the configured username and password hash.
+- A successful login regenerates the session ID. Logout invalidates the session and regenerates the CSRF token.
+- Protected HTML requests redirect to login when the session is missing or expired; AJAX requests receive HTTP 401 and the table manager redirects to login.
+- Session lifetime and secure-cookie behavior are controlled through Laravel's standard `SESSION_LIFETIME`, `SESSION_SECURE_COOKIE`, and related session settings.
+
+## Dynamic tables and XLSX exports
+
+Personnel, training, and assignment lists use server-side filtering, sorting, and pagination. Inputs update after a 350 ms debounce, in-flight requests are cancelled with `AbortController`, and filter state is preserved in the URL so refresh and browser back/forward work. Without JavaScript the same forms and links continue to work as normal GET requests.
+
+Each table can export the current page, every matching row, or selected rows. Exports are genuine Office Open XML `.xlsx` workbooks produced with PhpSpreadsheet (not renamed CSV), include styled headings and real Excel date values, and neutralize formula-leading cell content. Export routes use the same session authorization as management screens.
+
 ## API authentication and endpoints
 
 Send `Authorization: Bearer <token>` to:
@@ -105,7 +121,7 @@ Tests use in-memory SQLite and `Http::fake()`; they do not alter either developm
 
 ## Security approach
 
-Both applications use CSRF protection, server-side validation, escaped Blade output, Eloquent parameter binding, throttling, and secrets loaded only from environment variables. The API token remains server-side and is never rendered into HTML or JavaScript. Both management interfaces use HTTP Basic Auth to keep the exercise small; Basic Auth must only be used locally or behind HTTPS in a deployed environment.
+Both applications use CSRF protection, server-side validation, escaped Blade output, Eloquent parameter binding, throttling, session fixation protection, and secrets loaded only from environment variables. The API token remains server-side and is never rendered into HTML or JavaScript. Production deployments must use HTTPS and secure cookies.
 
 ## Design decisions
 
@@ -126,4 +142,4 @@ Both applications use CSRF protection, server-side validation, escaped Blade out
 
 ## Known limitations
 
-This time-boxed project uses Basic Auth rather than a full administrator account/role flow, depends on CDN-hosted Bootstrap/SweetAlert assets for the UI, and does not include training content, exams, certificates, queues, or deployment infrastructure.
+The environment-configured single-administrator approach does not provide user/role administration or password recovery. The UI depends on CDN-hosted Bootstrap, Bootstrap Icons, and SweetAlert assets and does not include training content, exams, certificates, queues, or deployment infrastructure.

@@ -10,21 +10,13 @@ class EnsureAdminAccess
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $username = (string) config('personnel.admin_username');
-        $passwordHash = (string) config('personnel.admin_password_hash');
-
-        $authenticated = $username !== ''
-            && $passwordHash !== ''
-            && hash_equals($username, (string) $request->getUser())
-            && password_verify((string) $request->getPassword(), $passwordHash);
-
-        if (! $authenticated) {
-            return response('Personel yonetimi icin kimlik dogrulamasi gerekli.', 401, [
-                'WWW-Authenticate' => 'Basic realm="Personel Yonetimi", charset="UTF-8"',
-                'Cache-Control' => 'no-store',
-            ]);
+        if ($request->session()->get('personnel_admin') !== true) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Oturum süresi doldu.'], 401)
+                : redirect()->guest(route('login'))->with('warning', 'Devam etmek için giriş yapın.');
         }
-
-        return $next($request);
+        $response = $next($request);
+        $response->headers->set('Cache-Control', 'no-store, private');
+        return $response;
     }
 }
