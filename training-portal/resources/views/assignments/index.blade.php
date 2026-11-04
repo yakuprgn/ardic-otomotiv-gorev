@@ -34,8 +34,7 @@
 @endif
 
 <section class="panel overflow-hidden" data-dynamic-table>
-
-    {{-- Filtre formu yalnızca araç çubuğunu kapsar. --}}
+    {{-- Filtre formu işlem formlarından bağımsızdır. --}}
     <form
         id="assignmentFilters"
         action="{{ route('assignments.index') }}"
@@ -91,12 +90,7 @@
                 data-filter
             >
                 @foreach([10, 25, 50, 100] as $n)
-                    <option
-                        value="{{ $n }}"
-                        @selected((int) $perPage === $n)
-                    >
-                        {{ $n }}
-                    </option>
+                    <option value="{{ $n }}" @selected((int) $perPage === $n)>{{ $n }}</option>
                 @endforeach
             </select>
 
@@ -149,8 +143,7 @@
                             data-export="{{ route('assignments.export') }}"
                             data-scope="selected"
                         >
-                            Seçilenler
-                            (<span data-selected-count>0</span>)
+                            Seçilenler (<span data-selected-count>0</span>)
                         </button>
                     </li>
                 </ul>
@@ -333,25 +326,16 @@
                                 <div class="fw-semibold">
                                     {{ $a->employee_name }}
                                 </div>
-
                                 <small class="text-secondary">
-                                    {{ $a->employee_email }}
-                                    ·
-                                    {{ $a->employee_department }}
+                                    {{ $a->employee_email }} · {{ $a->employee_department }}
                                 </small>
                             </td>
 
-                            <td>
-                                {{ $a->training->name }}
-                            </td>
+                            <td>{{ $a->training->name }}</td>
 
-                            <td>
-                                {{ $a->assigned_at->format('d.m.Y H:i') }}
-                            </td>
+                            <td>{{ $a->assigned_at->format('d.m.Y H:i') }}</td>
 
-                            <td>
-                                {{ $a->completed_at?->format('d.m.Y H:i') ?? '—' }}
-                            </td>
+                            <td>{{ $a->completed_at?->format('d.m.Y H:i') ?? '—' }}</td>
                         </tr>
                     @empty
                         <tr>
@@ -368,19 +352,14 @@
 
     <div class="p-3 border-top d-flex flex-wrap justify-content-between gap-2">
         <small class="text-secondary">
-            {{ $assignments->firstItem() ?? 0 }}
-            –
-            {{ $assignments->lastItem() ?? 0 }}
-            /
-            {{ $assignments->total() }}
-            kayıt
+            {{ $assignments->firstItem() ?? 0 }}–{{ $assignments->lastItem() ?? 0 }}
+            / {{ $assignments->total() }} kayıt
         </small>
 
         {{ $assignments->onEachSide(1)->links('pagination::bootstrap-5') }}
     </div>
 </section>
 
-{{-- Yeni atama formu tablo ve filtre formundan bağımsızdır. --}}
 <div
     class="modal fade"
     id="assignmentModal"
@@ -399,10 +378,7 @@
                 @csrf
 
                 <div class="modal-header">
-                    <h2
-                        class="modal-title fs-5"
-                        id="assignmentModalTitle"
-                    >
+                    <h2 class="modal-title fs-5" id="assignmentModalTitle">
                         <i class="bi bi-person-plus me-2"></i>
                         Yeni Eğitim Ataması
                     </h2>
@@ -416,10 +392,7 @@
                 </div>
 
                 <div class="modal-body p-4">
-                    <label
-                        class="form-label"
-                        for="assignmentEmployee"
-                    >
+                    <label class="form-label" for="assignmentEmployee">
                         Personel *
                     </label>
 
@@ -432,22 +405,11 @@
                         <option value="">Seçin</option>
 
                         @foreach($employees as $e)
-                            <option
-                                value="{{ $e['id'] }}"
-                                @selected(old('employee_id') == $e['id'])
-                            >
-                                {{ $e['first_name'] }}
-                                {{ $e['last_name'] }}
-                                —
-                                {{ $e['department'] }}
-                            </option>
+                            <option value="{{ $e['id'] }}" @selected(old('employee_id') == $e['id'])>{{ $e['first_name'] }} {{ $e['last_name'] }} — {{ $e['department'] }}</option>
                         @endforeach
                     </select>
 
-                    <label
-                        class="form-label"
-                        for="assignmentTraining"
-                    >
+                    <label class="form-label" for="assignmentTraining">
                         Eğitim *
                     </label>
 
@@ -460,12 +422,7 @@
                         <option value="">Seçin</option>
 
                         @foreach($trainings as $t)
-                            <option
-                                value="{{ $t->id }}"
-                                @selected(old('training_id') == $t->id)
-                            >
-                                {{ $t->name }}
-                            </option>
+                            <option value="{{ $t->id }}" @selected(old('training_id') == $t->id)>{{ $t->name }}</option>
                         @endforeach
                     </select>
                 </div>
